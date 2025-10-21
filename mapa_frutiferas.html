@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Frutíferas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stat-card .label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        #map {
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 3px solid white;
+        }
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 18px;
+            padding: 20px;
+        }
+        .popup-content {
+            max-width: 300px;
+            font-size: 13px;
+        }
+        .popup-content h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+        .popup-content .info-row {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .popup-content .label {
+            font-weight: bold;
+            color: #555;
+        }
+        .popup-content .value {
+            color: #333;
+            text-align: right;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌳 Mapa de Frutíferas</h1>
+            <p>Visualização espacial dos dados de árvores frutíferas</p>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="number" id="totalTrees">0</div>
+                    <div class="label">Árvores Cadastradas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="totalSpecies">0</div>
+                    <div class="label">Espécies Diferentes</div>
+                </div>
+            </div>
+        </div>
+        <div class="loading" id="loading">Carregando dados...</div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://erbefbnjxgpetbetlzya.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_0ZpbYf9Pob7ix8egIFX4KQ_X5d-1K4x';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        let map;
+        let markers = [];
+
+        function initMap() {
+            map = L.map('map').setView([-7.1195, -34.8450], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Não informado';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function formatValue(value) {
+            if (value === null || value === undefined) return 'Não informado';
+            return value;
+        }
+
+        function createPopupContent(tree) {
+            let content = `
+                <div class="popup-content">
+                    <h3>${tree.nome_popular || 'Sem nome'}</h3>
+                    <div class="info-row">
+                        <span class="label">Nome Científico:</span>
+                        <span class="value">${formatValue(tree.nome_cientifico)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Data Plantio:</span>
+                        <span class="value">${formatDate(tree.data_plantio)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Tipo Plantio:</span>
+                        <span class="value">${formatValue(tree.tipo_plantio)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Altura Total:</span>
+                        <span class="value">${formatValue(tree.altura_total)} m</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Diâmetro Copa:</span>
+                        <span class="value">${formatValue(tree.diametro_copa)} m</span>
+                    </div>
+            `;
+
+            if (tree.inicio_colheita || tree.fim_colheita) {
+                content += `
+                    <div class="info-row">
+                        <span class="label">Período Colheita:</span>
+                        <span class="value">${formatDate(tree.inicio_colheita)} - ${formatDate(tree.fim_colheita)}</span>
+                    </div>
+                `;
+            }
+
+            if (tree.volume_colhido) {
+                content += `
+                    <div class="info-row">
+                        <span class="label">Volume Colhido:</span>
+                        <span class="value">${tree.volume_colhido} kg</span>
+                    </div>
+                `;
+            }
+
+            content += `</div>`;
+            return content;
+        }
+
+        async function loadData() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('frutiferas')
+                    .select('*');
+
+                if (error) throw error;
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (data && data.length > 0) {
+                    const bounds = [];
+                    const species = new Set();
+
+                    data.forEach(tree => {
+                        if (tree.latitude && tree.longitude) {
+                            const marker = L.marker([tree.latitude, tree.longitude], {
+                                icon: L.icon({
+                                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                                    iconSize: [25, 41],
+                                    iconAnchor: [12, 41],
+                                    popupAnchor: [1, -34],
+                                    shadowSize: [41, 41]
+                                })
+                            });
+
+                            marker.bindPopup(createPopupContent(tree));
+                            marker.addTo(map);
+                            markers.push(marker);
+                            bounds.push([tree.latitude, tree.longitude]);
+
+                            if (tree.nome_popular) {
+                                species.add(tree.nome_popular);
+                            }
+                        }
+                    });
+
+                    if (bounds.length > 0) {
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+
+                    document.getElementById('totalTrees').textContent = data.length;
+                    document.getElementById('totalSpecies').textContent = species.size;
+                } else {
+                    document.getElementById('loading').textContent = 'Nenhum dado encontrado';
+                    document.getElementById('loading').style.display = 'block';
+                }
+
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                document.getElementById('loading').textContent = 'Erro ao carregar dados: ' + error.message;
+                document.getElementById('loading').style.display = 'block';
+            }
+        }
+
+        initMap();
+        loadData();
+    </script>
+</body>
+</html>
