@@ -4,117 +4,550 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa de Frutíferas</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
+        /* ============================================ */
+        /* VARIÁVEIS CSS CUSTOMIZADAS */
+        /* ============================================ */
+        :root {
+            --sidebar-width: 380px;
+            --header-height: 64px;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* ============================================ */
+        /* CONFIGURAÇÕES GLOBAIS */
+        /* ============================================ */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--font-family);
+            overflow: hidden;
+        }
+
+        /* ============================================ */
+        /* CABEÇALHO / HEADER */
+        /* ============================================ */
+        .navbar {
+            height: var(--header-height);
+            z-index: 1000;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .header h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        .stats {
+
+        /* ============================================ */
+        /* CONTAINER PRINCIPAL */
+        /* ============================================ */
+        .main-container {
+            height: 100vh;
+            padding-top: var(--header-height);
             display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin-top: 15px;
         }
+
+        /* ============================================ */
+        /* BARRA LATERAL / SIDEBAR */
+        /* ============================================ */
+        .sidebar {
+            width: var(--sidebar-width);
+            padding: 1.5rem;
+            z-index: 100;
+            background-color: #f8f9fa;
+            overflow-y: auto;
+            border-right: 1px solid #e5e7eb;
+        }
+
+        /* Scrollbar customizada */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: #f3f4f6;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+        }
+
+        /* ============================================ */
+        /* PAINÉIS DE CARDS */
+        /* ============================================ */
+        .card {
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            background-color: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            color: #374151;
+        }
+
         .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px 30px;
-            border-radius: 8px;
+            padding: 1rem;
+            border-radius: 0.5rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .stat-card .number {
-            font-size: 24px;
+            font-size: 2rem;
             font-weight: bold;
+            margin-bottom: 0.25rem;
         }
+
         .stat-card .label {
-            font-size: 14px;
+            font-size: 0.875rem;
             opacity: 0.9;
         }
-        #map {
-            height: 600px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border: 3px solid white;
+
+        /* ============================================ */
+        /* MAPAS BASE */
+        /* ============================================ */
+        .basemap-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
         }
-        .loading {
-            text-align: center;
+
+        .basemap-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background-color: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .basemap-btn:hover {
+            background-color: #dbeafe;
+            border-color: #1e40af;
+            color: #1e40af;
+        }
+
+        .basemap-btn.active {
+            background-color: #1e40af;
+            border-color: #1e3a8a;
             color: white;
-            font-size: 18px;
-            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+
+        .basemap-btn i {
+            font-size: 1.5rem;
+        }
+
+        /* ============================================ */
+        /* ITENS DE CAMADAS */
+        /* ============================================ */
+        .layer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .layer-item:hover {
+            background-color: #dbeafe;
+            border-color: #1e40af;
+        }
+
+        .layer-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .layer-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid currentColor;
+        }
+
+        .layer-label {
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        /* ============================================ */
+        /* SWITCH DE CAMADAS (Toggle) */
+        /* ============================================ */
+        .layer-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .layer-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .layer-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #d1d5db;
+            border-radius: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .layer-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        input:checked + .layer-slider {
+            background-color: #1e40af;
+        }
+
+        input:checked + .layer-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* ============================================ */
+        /* SIMBOLOGIA */
+        /* ============================================ */
+        .symbology-section {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .symbology-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.813rem;
+        }
+
+        .symbology-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .symbology-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+
+        /* ============================================ */
+        /* CONTAINER DO MAPA */
+        /* ============================================ */
+        .map-container {
+            position: relative;
+            flex: 1;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ============================================ */
+        /* CUSTOMIZAÇÕES DO LEAFLET */
+        /* ============================================ */
+        .leaflet-popup-content-wrapper {
+            border-radius: 0.5rem !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .leaflet-popup-content {
+            font-family: var(--font-family) !important;
+            line-height: 1.6 !important;
+        }
+
         .popup-content {
             max-width: 300px;
             font-size: 13px;
         }
+
         .popup-content h3 {
             margin: 0 0 10px 0;
             color: #667eea;
             border-bottom: 2px solid #667eea;
             padding-bottom: 5px;
         }
+
         .popup-content .info-row {
             margin: 8px 0;
             display: flex;
             justify-content: space-between;
+            gap: 1rem;
         }
-        .popup-content .label {
+
+        .popup-content .info-label {
             font-weight: bold;
             color: #555;
         }
-        .popup-content .value {
+
+        .popup-content .info-value {
             color: #333;
             text-align: right;
         }
-        .leaflet-popup-content-wrapper {
-            border-radius: 8px;
+
+        /* ============================================ */
+        /* PAINEL DE STATUS */
+        /* ============================================ */
+        .status-panel {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .status-panel.show {
+            display: flex !important;
+        }
+
+        .status-panel.success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status-panel.error {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .status-panel.info {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bae6fd;
+        }
+
+        /* ============================================ */
+        /* RESPONSIVIDADE - MOBILE */
+        /* ============================================ */
+        @media (max-width: 768px) {
+            :root {
+                --header-height: auto;
+            }
+            
+            .navbar {
+                height: auto;
+                padding: 0.75rem 1rem;
+            }
+            
+            .main-container {
+                flex-direction: column;
+                padding-top: 0;
+            }
+            
+            .sidebar {
+                width: 100%;
+                order: 2;
+                max-height: 40vh;
+            }
+            
+            .map-container {
+                order: 1;
+                height: 60vh;
+            }
+
+            .basemap-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌳 Mapa de Frutíferas</h1>
-            <p>Visualização espacial dos dados de árvores frutíferas</p>
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="number" id="totalTrees">0</div>
-                    <div class="label">Árvores Cadastradas</div>
+    <!-- CABEÇALHO -->
+    <nav class="navbar navbar-dark fixed-top">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-tree"></i> Sistema de Frutíferas
+            </span>
+            <span class="text-white">
+                <i class="fas fa-map-marked-alt"></i> Visualização Geoespacial
+            </span>
+        </div>
+    </nav>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <div class="main-container">
+        <!-- BARRA LATERAL -->
+        <div class="sidebar">
+            <!-- Painel de Status -->
+            <div id="statusPanel" class="status-panel">
+                <i class="fas fa-info-circle"></i>
+                <span id="statusMessage">Carregando dados...</span>
+            </div>
+
+            <!-- Card de Estatísticas -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar"></i> Estatísticas
                 </div>
-                <div class="stat-card">
-                    <div class="number" id="totalSpecies">0</div>
-                    <div class="label">Espécies Diferentes</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="stat-card">
+                                <div class="number" id="totalTrees">0</div>
+                                <div class="label">Árvores</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-card">
+                                <div class="number" id="totalSpecies">0</div>
+                                <div class="label">Espécies</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card de Mapas Base -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-layer-group"></i> Mapas Base
+                </div>
+                <div class="card-body">
+                    <div class="basemap-grid">
+                        <div class="basemap-btn active" data-basemap="osm">
+                            <i class="fas fa-map"></i>
+                            <span>OpenStreetMap</span>
+                        </div>
+                        <div class="basemap-btn" data-basemap="satellite">
+                            <i class="fas fa-satellite"></i>
+                            <span>Satélite</span>
+                        </div>
+                        <div class="basemap-btn" data-basemap="topo">
+                            <i class="fas fa-mountain"></i>
+                            <span>Topográfico</span>
+                        </div>
+                        <div class="basemap-btn" data-basemap="dark">
+                            <i class="fas fa-moon"></i>
+                            <span>Escuro</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card de Camadas -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-layer-group"></i> Camadas
+                </div>
+                <div class="card-body">
+                    <!-- Camada de Frutíferas -->
+                    <div class="layer-item">
+                        <div class="layer-left">
+                            <div class="layer-badge" style="color: #10b981;"></div>
+                            <span class="layer-label">Frutíferas</span>
+                        </div>
+                        <label class="layer-switch">
+                            <input type="checkbox" id="layerFrutiferas" checked>
+                            <span class="layer-slider"></span>
+                        </label>
+                    </div>
+                    
+                    <!-- Simbologia de Frutíferas -->
+                    <div class="symbology-section" id="symbologyFrutiferas">
+                        <div class="text-muted mb-2" style="font-size: 0.75rem; font-weight: 600;">LEGENDA POR ESPÉCIE</div>
+                        <div class="symbology-item">
+                            <div class="symbology-icon" style="border-color: #10b981; background-color: #10b981;"></div>
+                            <span id="species1">Carregando...</span>
+                        </div>
+                        <div class="symbology-item">
+                            <div class="symbology-icon" style="border-color: #f59e0b; background-color: #f59e0b;"></div>
+                            <span id="species2">Carregando...</span>
+                        </div>
+                        <div class="symbology-item">
+                            <div class="symbology-icon" style="border-color: #ef4444; background-color: #ef4444;"></div>
+                            <span id="species3">Carregando...</span>
+                        </div>
+                        <div class="symbology-item">
+                            <div class="symbology-icon" style="border-color: #8b5cf6; background-color: #8b5cf6;"></div>
+                            <span id="species4">Carregando...</span>
+                        </div>
+                    </div>
+
+                    <!-- Camada de Mosaico -->
+                    <div class="layer-item">
+                        <div class="layer-left">
+                            <div class="layer-badge" style="color: #f59e0b;"></div>
+                            <span class="layer-label">Mosaico Aéreo</span>
+                        </div>
+                        <label class="layer-switch">
+                            <input type="checkbox" id="layerMosaico">
+                            <span class="layer-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Simbologia de Mosaico -->
+                    <div class="symbology-section" id="symbologyMosaico" style="display: none;">
+                        <div class="text-muted mb-2" style="font-size: 0.75rem; font-weight: 600;">LEGENDA</div>
+                        <div class="symbology-item">
+                            <div style="width: 30px; height: 16px; background: linear-gradient(to right, #f59e0b, #ef4444); border: 1px solid #d1d5db; border-radius: 2px;"></div>
+                            <span>Imagem Ortorretificada</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="loading" id="loading">Carregando dados...</div>
-        <div id="map"></div>
+
+        <!-- MAPA -->
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <script>
         const SUPABASE_URL = 'https://erbefbnjxgpetbetlzya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_0ZpbYf9Pob7ix8egIFX4KQ_X5d-1K4x';
@@ -123,15 +556,69 @@
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let map;
-        let markers = [];
+        let baseLayers = {};
+        let overlayLayers = {};
+        let markers = {};
+        let allTreesData = [];
+        let currentBaseLayer = 'osm';
+        let speciesColors = {
+            color1: '#10b981',
+            color2: '#f59e0b', 
+            color3: '#ef4444',
+            color4: '#8b5cf6'
+        };
+        let speciesColorMap = {};
+
+        function showStatus(message, type = 'info') {
+            const panel = document.getElementById('statusPanel');
+            const messageEl = document.getElementById('statusMessage');
+            
+            panel.className = `status-panel show ${type}`;
+            messageEl.textContent = message;
+
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    panel.classList.remove('show');
+                }, 3000);
+            }
+        }
 
         function initMap() {
             map = L.map('map').setView([-7.1195, -34.8450], 13);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // Mapas Base
+            baseLayers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
+
+            baseLayers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Esri, Maxar, Earthstar Geographics',
+                maxZoom: 19
+            });
+
+            baseLayers.topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenTopoMap contributors',
+                maxZoom: 17
+            });
+
+            baseLayers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CARTO',
+                maxZoom: 19
+            });
+
+            // Layer group para marcadores
+            overlayLayers.frutiferas = L.layerGroup().addTo(map);
+
+            // Camada de Mosaico Aéreo
+            overlayLayers.mosaico = L.imageOverlay(
+                'https://erbefbnjxgpetbetlzya.supabase.co/storage/v1/object/public/mosaico_tiles/mosaico_tile.tif',
+                [[-7.15, -34.88], [-7.09, -34.81]], // Ajuste os bounds conforme necessário
+                {
+                    opacity: 0.7,
+                    attribution: 'Mosaico Aéreo'
+                }
+            );
         }
 
         function formatDate(dateString) {
@@ -150,32 +637,32 @@
                 <div class="popup-content">
                     <h3>${tree.nome_popular || 'Sem nome'}</h3>
                     <div class="info-row">
-                        <span class="label">Nome Científico:</span>
-                        <span class="value">${formatValue(tree.nome_cientifico)}</span>
+                        <span class="info-label">Nome Científico:</span>
+                        <span class="info-value">${formatValue(tree.nome_cientifico)}</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">Data Plantio:</span>
-                        <span class="value">${formatDate(tree.data_plantio)}</span>
+                        <span class="info-label">Data Plantio:</span>
+                        <span class="info-value">${formatDate(tree.data_plantio)}</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">Tipo Plantio:</span>
-                        <span class="value">${formatValue(tree.tipo_plantio)}</span>
+                        <span class="info-label">Tipo Plantio:</span>
+                        <span class="info-value">${formatValue(tree.tipo_plantio)}</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">Altura Total:</span>
-                        <span class="value">${formatValue(tree.altura_total)} m</span>
+                        <span class="info-label">Altura:</span>
+                        <span class="info-value">${formatValue(tree.altura_total)} m</span>
                     </div>
                     <div class="info-row">
-                        <span class="label">Diâmetro Copa:</span>
-                        <span class="value">${formatValue(tree.diametro_copa)} m</span>
+                        <span class="info-label">Diâmetro Copa:</span>
+                        <span class="info-value">${formatValue(tree.diametro_copa)} m</span>
                     </div>
             `;
 
             if (tree.inicio_colheita || tree.fim_colheita) {
                 content += `
                     <div class="info-row">
-                        <span class="label">Período Colheita:</span>
-                        <span class="value">${formatDate(tree.inicio_colheita)} - ${formatDate(tree.fim_colheita)}</span>
+                        <span class="info-label">Colheita:</span>
+                        <span class="info-value">${formatDate(tree.inicio_colheita)} - ${formatDate(tree.fim_colheita)}</span>
                     </div>
                 `;
             }
@@ -183,8 +670,8 @@
             if (tree.volume_colhido) {
                 content += `
                     <div class="info-row">
-                        <span class="label">Volume Colhido:</span>
-                        <span class="value">${tree.volume_colhido} kg</span>
+                        <span class="info-label">Volume:</span>
+                        <span class="info-value">${tree.volume_colhido} kg</span>
                     </div>
                 `;
             }
@@ -193,7 +680,28 @@
             return content;
         }
 
+        function getMarkerIcon(species) {
+            const color = speciesColorMap[species] || '#10b981';
+            const colorName = {
+                '#10b981': 'green',
+                '#f59e0b': 'orange',
+                '#ef4444': 'red',
+                '#8b5cf6': 'violet'
+            }[color] || 'green';
+
+            return L.icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${colorName}.png`,
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+        }
+
         async function loadData() {
+            showStatus('Carregando dados do banco...', 'info');
+            
             try {
                 const { data, error } = await supabaseClient
                     .from('frutiferas')
@@ -201,33 +709,51 @@
 
                 if (error) throw error;
 
-                document.getElementById('loading').style.display = 'none';
-
                 if (data && data.length > 0) {
+                    allTreesData = data;
                     const bounds = [];
                     const species = new Set();
+                    
+                    // Identificar as espécies únicas
+                    data.forEach(tree => {
+                        if (tree.nome_popular) {
+                            species.add(tree.nome_popular);
+                        }
+                    });
+
+                    // Mapear cores para as espécies
+                    const speciesArray = Array.from(species).sort();
+                    const colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                    speciesArray.forEach((sp, idx) => {
+                        speciesColorMap[sp] = colors[idx % colors.length];
+                    });
+
+                    // Atualizar legenda
+                    speciesArray.forEach((sp, idx) => {
+                        const element = document.getElementById(`species${idx + 1}`);
+                        if (element && idx < 4) {
+                            element.textContent = sp;
+                        }
+                    });
+
+                    // Ocultar legendas não utilizadas
+                    for (let i = speciesArray.length; i < 4; i++) {
+                        const element = document.getElementById(`species${i + 1}`);
+                        if (element) {
+                            element.parentElement.style.display = 'none';
+                        }
+                    }
 
                     data.forEach(tree => {
                         if (tree.latitude && tree.longitude) {
                             const marker = L.marker([tree.latitude, tree.longitude], {
-                                icon: L.icon({
-                                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                                    iconSize: [25, 41],
-                                    iconAnchor: [12, 41],
-                                    popupAnchor: [1, -34],
-                                    shadowSize: [41, 41]
-                                })
+                                icon: getMarkerIcon(tree.nome_popular)
                             });
 
                             marker.bindPopup(createPopupContent(tree));
-                            marker.addTo(map);
-                            markers.push(marker);
+                            overlayLayers.frutiferas.addLayer(marker);
+                            markers[tree.id] = marker;
                             bounds.push([tree.latitude, tree.longitude]);
-
-                            if (tree.nome_popular) {
-                                species.add(tree.nome_popular);
-                            }
                         }
                     });
 
@@ -237,17 +763,64 @@
 
                     document.getElementById('totalTrees').textContent = data.length;
                     document.getElementById('totalSpecies').textContent = species.size;
+                    
+                    showStatus(`${data.length} árvores carregadas com sucesso!`, 'success');
                 } else {
-                    document.getElementById('loading').textContent = 'Nenhum dado encontrado';
-                    document.getElementById('loading').style.display = 'block';
+                    showStatus('Nenhum dado encontrado no banco', 'error');
                 }
 
             } catch (error) {
                 console.error('Erro ao carregar dados:', error);
-                document.getElementById('loading').textContent = 'Erro ao carregar dados: ' + error.message;
-                document.getElementById('loading').style.display = 'block';
+                showStatus('Erro ao carregar dados: ' + error.message, 'error');
             }
         }
+
+        // Event listeners para mapas base
+        document.querySelectorAll('.basemap-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const basemapType = this.dataset.basemap;
+                
+                // Remove active de todos
+                document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Remove camada atual
+                if (baseLayers[currentBaseLayer]) {
+                    map.removeLayer(baseLayers[currentBaseLayer]);
+                }
+                
+                // Adiciona nova camada
+                if (baseLayers[basemapType]) {
+                    baseLayers[basemapType].addTo(map);
+                    currentBaseLayer = basemapType;
+                }
+            });
+        });
+
+        // Event listener para camada de frutíferas
+        document.getElementById('layerFrutiferas').addEventListener('change', function() {
+            const symbology = document.getElementById('symbologyFrutiferas');
+            if (this.checked) {
+                overlayLayers.frutiferas.addTo(map);
+                symbology.style.display = 'block';
+            } else {
+                map.removeLayer(overlayLayers.frutiferas);
+                symbology.style.display = 'none';
+            }
+        });
+
+        // Event listener para camada de mosaico
+        document.getElementById('layerMosaico').addEventListener('change', function() {
+            const symbology = document.getElementById('symbologyMosaico');
+            if (this.checked) {
+                overlayLayers.mosaico.addTo(map);
+                symbology.style.display = 'block';
+                showStatus('Mosaico aéreo carregado', 'success');
+            } else {
+                map.removeLayer(overlayLayers.mosaico);
+                symbology.style.display = 'none';
+            }
+        });
 
         initMap();
         loadData();
